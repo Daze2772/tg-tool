@@ -1,6 +1,6 @@
 add_batch_size: 50
-add_delay_ms: 5000
-add_jitter_ms: 3000
+add_delay_ms: 30000
+add_jitter_ms: 10000
 api_hash: b4bb447ccdd4e4332a80783ebedad15f
 api_id: 25878721
 db_path: data/scraper.db
@@ -10,6 +10,6 @@ log_level: INFO
 max_sessions: 5
 proxy_list: proxies.txt
 scrape_batch_size: 200
-scrape_delay_ms: 500
+scrape_delay_ms: 2000
 session_dir: sessions
 targets: targets.txt

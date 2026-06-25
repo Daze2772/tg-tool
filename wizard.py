@@ -141,22 +141,42 @@ async def wizard(config: dict) -> bool:
         for i, f in enumerate(existing, 1):
             name = f.stem.replace("_", "+")
             print(f"  [{i}] {name}")
-        print(f"  [{len(existing) + 1}] Keep all")
+        print(f"  [Enter] Keep all")
         print(f"  [0] Remove all and start fresh")
-        choice = input_text("Remove any? (Enter number or Enter to keep all)", str(len(existing) + 1))
+        choice = input_text("Remove which? (number or phone, Enter=keep)", "").strip()
+
+        removed = False
         if choice == "0":
             import shutil
             for f in existing:
                 f.unlink()
             saved_phones = []
+            removed = True
             print("  ✓ All sessions removed")
-        elif choice.isdigit() and 1 <= int(choice) <= len(existing):
-            idx = int(choice) - 1
-            existing[idx].unlink()
-            removed_phone = existing[idx].stem.replace("_", "+")
-            saved_phones = [p for p in saved_phones if p != removed_phone]
-            print(f"  ✓ Removed {removed_phone}")
-        save_secrets({"phones": saved_phones})
+        elif choice:
+            # Try as index number first
+            if choice.isdigit() and 1 <= int(choice) <= len(existing):
+                idx = int(choice) - 1
+                removed_phone = existing[idx].stem.replace("_", "+")
+                existing[idx].unlink()
+                saved_phones = [p for p in saved_phones if p != removed_phone]
+                removed = True
+                print(f"  ✓ Removed [{choice}] {removed_phone}")
+            else:
+                # Try matching by phone number
+                clean = choice.replace("+", "_").replace(" ", "")
+                for f in existing:
+                    if f.stem == clean:
+                        f.unlink()
+                        saved_phones = [p for p in saved_phones if p != f.stem.replace("_", "+")]
+                        removed = True
+                        print(f"  ✓ Removed {choice}")
+                        break
+                if not removed:
+                    print(f"  ✗ '{choice}' not found — kept all")
+
+        if removed:
+            save_secrets({"phones": saved_phones})
         print("└──────────────────────────────────────────┘")
         print()
 
