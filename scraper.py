@@ -121,62 +121,70 @@ class Scraper:
 
         self.progress[target] = {"total": total, "scraped": 0, "status": "scraping"}
         new_users = 0
+        offset = 0
+        all_participants = []
 
-        # Use iter_participants for this version (Telethon 1.29.3)
-        # For large groups, rework pagination with GetParticipantsRequest
-        try:
-            participants = []
-            async for user in client.iter_participants(
-                entity, limit=self.batch_size, aggressive=False
-            ):
-                if self._stop:
+        while not self._stop and (offset == 0 or offset < total or total == 0):
+            try:
+                result = await client(GetParticipantsRequest(
+                    channel=entity,
+                    filter=ChannelParticipantsSearch(""),
+                    offset=offset,
+                    limit=self.batch_size,
+                    hash=0,
+                ))
+                batch = getattr(result, 'users', [])
+                if not batch:
                     break
-                participants.append(user)
-            logger.info(f"[{target}] Got {len(participants)} participants")
-        except FloodWaitError as e:
-            wait = e.seconds
-            logger.warning(f"[{target}] FLOOD_WAIT scrape: {wait}s")
-            await self.pool.report_flood_wait(session, wait)
-            self.progress[target]["status"] = f"flood_wait {wait}s"
-            await asyncio.sleep(wait)
-            participants = []
-        except Exception as e:
-            logger.error(f"[{target}] Scrape error: {e}")
-            self.progress[target]["status"] = f"error: {e}"
-            return 0, 0
 
-        for user in participants:
-            if self._stop:
+                all_participants.extend(batch)
+                offset += len(batch)
+                self.progress[target]["scraped"] = offset
+
+                logger.info(
+                    f"[{target}] Scraped {offset}/{total or '?'} "
+                    f"({len(batch)} this batch)"
+                )
+
+                # Process this batch through dedup
+                for user in batch:
+                    if self._stop:
+                        break
+                    if not isinstance(user, User) or user.bot:
+                        continue
+                    uid = user.id
+                    uname = user.username or ""
+                    fname = user.first_name or ""
+                    lname = user.last_name or ""
+                    phone = getattr(user, "phone", "") or ""
+                    is_new = await self.db.upsert_user(
+                        user_id=uid, username=uname,
+                        first_name=fname, last_name=lname,
+                        phone=phone, source=target,
+                    )
+                    if is_new:
+                        new_users += 1
+
+                await self.pool.report_success(session)
+                await asyncio.sleep(self.delay_ms / 1000.0)
+
+            except FloodWaitError as e:
+                wait = e.seconds
+                logger.warning(f"[{target}] FLOOD_WAIT: {wait}s")
+                await self.pool.report_flood_wait(session, wait)
+                self.progress[target]["status"] = f"flood_wait {wait}s"
+                await asyncio.sleep(wait)
+            except Exception as e:
+                logger.error(f"[{target}] Scrape error at offset {offset}: {e}")
+                self.progress[target]["status"] = f"error at offset {offset}"
                 break
-            if not isinstance(user, User) or user.bot:
-                continue
-            uid = user.id
-            uname = user.username or ""
-            fname = user.first_name or ""
-            lname = user.last_name or ""
-            phone = getattr(user, "phone", "") or ""
-            is_new = await self.db.upsert_user(
-                user_id=uid,
-                username=uname,
-                first_name=fname,
-                last_name=lname,
-                phone=phone,
-                source=target,
-            )
-            if is_new:
-                new_users += 1
-
-        self.progress[target]["scraped"] = len(participants)
-
-        await self.pool.report_success(session)
-        await asyncio.sleep(self.delay_ms / 1000.0)
 
         if self._stop:
             self.progress[target]["status"] = "stopped"
         else:
             self.progress[target]["status"] = "done"
-        logger.info(f"[{target}] Scrape complete: {new_users} new users")
-        return new_users, total or len(participants)
+        logger.info(f"[{target}] Scrape complete: {new_users} new users out of {len(all_participants)}")
+        return new_users, total or len(all_participants)
 
     async def run(self, targets: List[str]):
         """Scrape all targets, cycling sessions."""

@@ -9,7 +9,7 @@ log_file: logs/tool.log
 log_level: INFO
 max_sessions: 5
 proxy_list: proxies.txt
-scrape_batch_size: 100
+scrape_batch_size: 200
 scrape_delay_ms: 2000
 session_dir: sessions
 targets: targets.txt
