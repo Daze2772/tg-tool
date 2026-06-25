@@ -199,7 +199,45 @@ async def wizard(config: dict) -> bool:
     print("└──────────────────────────────────────────┘")
     print()
 
-    # ── Step 4: 2Captcha ──
+    # ── Step 4: Speed Mode ──
+    print("┌─ Speed Mode ─────────────────────────────┐")
+    print("  ⚡ [1] Lightning  — 500ms scrape / 5s add     (fast, risky)")
+    print("  🏃 [2] Normal     — 2s scrape / 30s add       (balanced)")
+    print("  🐢 [3] Safe       — 3s scrape / 60s add       (slow, safest)")
+    print("  🛠️  [4] Custom     — set your own delays")
+
+    stored_mode = secrets.get("speed_mode", "")
+    if stored_mode:
+        print(f"  Last used: {stored_mode}")
+
+    mode = input_text("Choose mode [1-4]", default="3")
+    if mode == "1":
+        scrape_delay, add_delay, add_jitter = 500, 5000, 3000
+        mode_name = "Lightning"
+    elif mode == "2":
+        scrape_delay, add_delay, add_jitter = 2000, 30000, 10000
+        mode_name = "Normal"
+    elif mode == "3":
+        scrape_delay, add_delay, add_jitter = 3000, 60000, 15000
+        mode_name = "Safe"
+    elif mode == "4":
+        scrape_delay = int(input_text("Scrape delay (ms)", "2000"))
+        add_delay = int(input_text("Add delay (ms)", "30000"))
+        add_jitter = int(input_text("Add jitter (ms)", "10000"))
+        mode_name = "Custom"
+    else:
+        scrape_delay, add_delay, add_jitter = 3000, 60000, 15000
+        mode_name = "Safe (default)"
+
+    config["scrape_delay_ms"] = scrape_delay
+    config["add_delay_ms"] = add_delay
+    config["add_jitter_ms"] = add_jitter
+    save_secrets({"speed_mode": mode_name})
+    print(f"  ✓ {mode_name}: scrape={scrape_delay}ms  add={add_delay}ms")
+    print("└──────────────────────────────────────────┘")
+    print()
+
+    # ── Step 5: 2Captcha ──
     print("┌─ 2Captcha API Key (optional) ────────────┐")
     captcha_current = secrets.get("2captcha_key", "")
     captcha_key = ""
@@ -215,7 +253,7 @@ async def wizard(config: dict) -> bool:
     print("└──────────────────────────────────────────┘")
     print()
 
-    # ── Step 5: Webshare ──
+    # ── Step 6: Webshare ──
     print("┌─ Webshare.io Proxy Key (optional) ───────┐")
     webshare_current = secrets.get("webshare_key", "")
     webshare_key = ""
@@ -246,8 +284,9 @@ async def wizard(config: dict) -> bool:
     print(f"  Destination : {dest}")
     print(f"  2Captcha    : {'✓' if captcha_key else '✗'}")
     print(f"  Webshare    : {'✓' if webshare_key else '✗'}")
+    print(f"  Speed mode  : {mode_name}")
     print(f"  Scrape delay: {config.get('scrape_delay_ms', 2000)}ms")
-    print(f"  Add delay   : {config.get('add_delay_ms', 5000)}ms")
+    print(f"  Add delay   : {config.get('add_delay_ms', 60000)}ms")
     print("╚══════════════════════════════════════════╝")
     print()
 
