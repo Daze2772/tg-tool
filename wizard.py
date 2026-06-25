@@ -129,9 +129,41 @@ async def wizard(config: dict) -> bool:
     # ── Step 2: Phone(s) + Auth ──
     secrets = load_secrets()
     saved_phones = secrets.get("phones", [])
-    session_names = []
-
     max_sessions = config.get("max_sessions", 5)
+
+    # Show existing sessions and offer cleanup
+    from pathlib import Path as PathLib
+    sessions_dir = PathLib(config.get("session_dir", "sessions"))
+    existing = list(sessions_dir.glob("*.session")) if sessions_dir.exists() else []
+
+    if existing:
+        print(f"┌─ Existing Accounts ({len(existing)} found) ──────────────┐")
+        for i, f in enumerate(existing, 1):
+            name = f.stem.replace("_", "+")
+            print(f"  [{i}] {name}")
+        print(f"  [{len(existing) + 1}] Keep all")
+        print(f"  [0] Remove all and start fresh")
+        choice = input_text("Remove any? (Enter number or Enter to keep all)", str(len(existing) + 1))
+        if choice == "0":
+            import shutil
+            for f in existing:
+                f.unlink()
+            saved_phones = []
+            print("  ✓ All sessions removed")
+        elif choice.isdigit() and 1 <= int(choice) <= len(existing):
+            idx = int(choice) - 1
+            existing[idx].unlink()
+            removed_phone = existing[idx].stem.replace("_", "+")
+            saved_phones = [p for p in saved_phones if p != removed_phone]
+            print(f"  ✓ Removed {removed_phone}")
+        save_secrets({"phones": saved_phones})
+        print("└──────────────────────────────────────────┘")
+        print()
+
+    # Count remaining after cleanup
+    sessions_dir = PathLib(config.get("session_dir", "sessions"))
+    existing = list(sessions_dir.glob("*.session")) if sessions_dir.exists() else []
+    session_names = [f.stem for f in existing]
 
     while True:
         remaining = max_sessions - len(session_names)

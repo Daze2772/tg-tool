@@ -202,6 +202,11 @@ class TuiDashboard:
         header_text = Text()
         header_text.append("⚡ TG Tool", style="bold cyan")
         header_text.append("  │  ", style="dim")
+        # Show active session count
+        if self.session_pool:
+            active = sum(1 for s in self.session_pool.get_status() if not s.get("quarantined"))
+            total = len(self.session_pool.get_status())
+            header_text.append(f"[green]{active} accounts[/green]  ", style="white")
         header_text.append(f"Dashboard  ", style="white")
         header_text.append(f"│  {now}", style="dim")
         header_text.append("\n", style="")
