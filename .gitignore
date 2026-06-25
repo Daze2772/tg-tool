@@ -1,0 +1,9 @@
+.secrets.yaml
+*.session
+*.session-journal
+*.session-wal
+*.session-shm
+data/
+logs/
+__pycache__/
+venv/

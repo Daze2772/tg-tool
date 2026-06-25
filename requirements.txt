@@ -1,0 +1,6 @@
+telethon>=1.24,<1.30
+fastapi>=0.100,<0.104
+uvicorn>=0.22,<0.24
+python-dotenv>=0.21
+aiosqlite>=0.19
+pyyaml>=6.0
