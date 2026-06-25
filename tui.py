@@ -103,6 +103,10 @@ class TuiDashboard:
         skipped = progress.get("skipped", 0)
         total = added + failed + skipped
 
+        # Get anti-limiting state
+        delay = getattr(self.adder, '_current_delay', 0)
+        floods = getattr(self.adder, '_consecutive_floods', 0)
+
         status_color = "green" if status == "done" else ("yellow" if status == "running" else "dim")
         lines = [
             f"Status: [{status_color}]{status}[/{status_color}]",
@@ -110,6 +114,8 @@ class TuiDashboard:
             f"❌ Failed: [red]{failed}[/red]",
             f"⏭️ Skipped: [yellow]{skipped}[/yellow]",
         ]
+        if delay > 1000:
+            lines.append(f"⏱️ Delay: [dim]{delay/1000:.0f}s[/dim]" + (f"  ⚡ floods:{floods}" if floods else ""))
         if total:
             pct = int(added / total * 100) if total else 0
             bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
@@ -139,28 +145,32 @@ class TuiDashboard:
         return Panel("\n".join(lines), title="⚠️ Rate Limit Events")
 
     def _build_counts_panel(self) -> Panel:
-        if not self.database:
-            return Panel("—", title="👥 Database")
+        """Read cached counts from adder (updated in real-time by pipeline)."""
+        lines = []
 
-        import asyncio
-        async def counts():
-            total = await self.database.count_users()
-            added = await self.database.count_added()
-            return total, added
-
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                lines = ["DB stats available after pipeline"]
-            else:
-                total, added = loop.run_until_complete(counts())
-                lines = [
-                    f"👥 Total users:  [bold cyan]{total}[/bold cyan]",
-                    f"✅ Added:       [bold green]{added}[/bold green]",
-                    f"⏳ Remaining:   [bold yellow]{total - added}[/bold yellow]",
-                ]
-        except Exception:
-            lines = ["DB stats unavailable"]
+        # Try adder cached counts first
+        if self.adder and hasattr(self.adder, 'db_counts'):
+            c = self.adder.db_counts
+            total = c.get("total", 0)
+            added = c.get("added", 0)
+            remaining = total - added
+            lines = [
+                f"👥 Total:    [bold cyan]{total}[/bold cyan]",
+                f"✅ Added:    [bold green]{added}[/bold green]",
+                f"⏳ Remaining: [bold yellow]{remaining}[/bold yellow]",
+            ]
+        elif self.scraper:
+            # Fallback: show scraper totals
+            progress = self.scraper.get_progress()
+            total_scraped = sum(
+                v.get("scraped", 0) or 0 for v in progress.values()
+            )
+            lines = [
+                f"👥 Scraped:  [bold cyan]{total_scraped}[/bold cyan]",
+                f"📡 Targets: [dim]{len(progress)}[/dim]",
+            ]
+        else:
+            lines = ["Waiting for pipeline..."]
 
         return Panel("\n".join(lines), title="👥 Database")
 
@@ -192,7 +202,7 @@ class TuiDashboard:
         header_text.append(f"Dashboard  ", style="white")
         header_text.append(f"│  {now}", style="dim")
         header_text.append("\n", style="")
-        header_text.append("Ctrl+C to stop  │  CSV auto-exported on completion", style="dim")
+        header_text.append("[bold yellow]Ctrl+C[/bold yellow] to stop  │  CSV auto-exports on completion", style="dim")
 
         layout["header"].update(Panel(header_text))
         layout["footer"].update(Panel(self._build_session_table()))

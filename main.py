@@ -51,9 +51,9 @@ def load_config(path: str = "config.yaml") -> dict:
     config["max_sessions"] = int(config.get("max_sessions", 5))
     config["scrape_delay_ms"] = int(config.get("scrape_delay_ms", 2000))
     config["scrape_batch_size"] = int(config.get("scrape_batch_size", 100))
-    config["add_delay_ms"] = int(config.get("add_delay_ms", 5000))
+    config["add_delay_ms"] = int(config.get("add_delay_ms", 15000))
     config["add_batch_size"] = int(config.get("add_batch_size", 50))
-    config["add_jitter_ms"] = int(config.get("add_jitter_ms", 3000))
+    config["add_jitter_ms"] = int(config.get("add_jitter_ms", 8000))
     return config
 
 

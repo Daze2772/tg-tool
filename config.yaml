@@ -1,6 +1,6 @@
 add_batch_size: 50
-add_delay_ms: 5000
-add_jitter_ms: 3000
+add_delay_ms: 15000
+add_jitter_ms: 8000
 api_hash: b4bb447ccdd4e4332a80783ebedad15f
 api_id: 25878721
 db_path: data/scraper.db

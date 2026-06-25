@@ -207,9 +207,9 @@ async def wizard(config: dict) -> bool:
         masked = captcha_current[:4] + "****" + captcha_current[-4:] if len(captcha_current) > 8 else "****"
         print(f"  Stored: {masked}")
         use = input_text("Use stored key? (Y/n)", "y").lower()
-        captcha_key = captcha_current if use != "n" else input_secret("2Captcha API key")
+        captcha_key = captcha_current if use != "n" else input_text("2Captcha API key")
     else:
-        captcha_key = input_secret("2Captcha API key (Enter to skip)")
+        captcha_key = input_text("2Captcha API key (Enter to skip)")
     if captcha_key:
         save_secrets({"2captcha_key": captcha_key})
     print("└──────────────────────────────────────────┘")
@@ -223,9 +223,9 @@ async def wizard(config: dict) -> bool:
         masked = webshare_current[:4] + "****" + webshare_current[-4:] if len(webshare_current) > 8 else "****"
         print(f"  Stored: {masked}")
         use = input_text("Use stored key? (Y/n)", "y").lower()
-        webshare_key = webshare_current if use != "n" else input_secret("Webshare.io API key")
+        webshare_key = webshare_current if use != "n" else input_text("Webshare.io API key")
     else:
-        webshare_key = input_secret("Webshare.io API key (Enter to skip)")
+        webshare_key = input_text("Webshare.io API key (Enter to skip)")
     if webshare_key:
         save_secrets({"webshare_key": webshare_key})
     print("└──────────────────────────────────────────┘")
