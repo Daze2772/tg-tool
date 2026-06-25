@@ -76,17 +76,20 @@ class TuiDashboard:
             scraped = info.get("scraped", 0) or 0
             total = info.get("total", 0)
             status = info.get("status", "?")
-            if total:
+            status_color = "green" if status == "done" else ("yellow" if "flood" in str(status) or "error" in str(status) else "cyan")
+
+            if total and total > 0:
                 pct = min(100, int(scraped / max(total, 1) * 100))
                 bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
+                count_str = f"{scraped}/{total}"
             else:
-                bar = "░" * 10
                 pct = 0
+                bar = "▓" * (min(scraped % 10, 10)) + "░" * (10 - min(scraped % 10, 10))
+                count_str = f"{scraped} scraped"
 
-            status_color = "green" if status == "done" else ("yellow" if "flood" in str(status) else "cyan")
             lines.append(
                 f"[bold]{target}[/bold]\n"
-                f"  {bar} {pct}%  {scraped}/{total or '?'}  "
+                f"  {bar} {pct}%  {count_str}  "
                 f"[{status_color}]{status}[/{status_color}]"
             )
 
