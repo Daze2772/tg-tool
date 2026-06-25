@@ -25,11 +25,13 @@ from database import Database
 logger = logging.getLogger("adder")
 
 # Anti-limiting defaults
-DEFAULT_ADD_DELAY_MS = 15000     # 15 seconds base
-DEFAULT_JITTER_MS = 8000          # 8 seconds jitter
-PEER_FLOOD_BACKOFF_MS = 45000    # 45 seconds backoff on PEER_FLOOD
-PEER_FLOOD_RETRIES = 3            # Retry same user this many times
-CONSECUTIVE_FLOOD_MULTIPLIER = 1.5  # Multiply delay on consecutive floods
+DEFAULT_ADD_DELAY_MS = 60000      # 60 seconds base (one per minute)
+DEFAULT_JITTER_MS = 15000          # 15 seconds jitter
+PEER_FLOOD_BACKOFF_MS = 120000    # 2 minutes backoff on PEER_FLOOD
+PEER_FLOOD_RETRIES = 5             # Retry same user up to 5 times
+CONSECUTIVE_FLOOD_MULTIPLIER = 2.0 # Double delay on consecutive floods
+MAX_CONSECUTIVE_FLOODS = 3         # After 3 consecutive floods, long cooldown
+LONG_COOLDOWN_MS = 900000          # 15 minute cooldown when hitting flood ceiling
 
 
 class Adder:
@@ -218,6 +220,25 @@ class Adder:
                 # Update cached counts
                 self.db_counts["added"] = self.progress["added"]
                 self.db_counts["total"] = self.progress["total"]
+
+                # Long cooldown if hitting too many consecutive floods
+                if self._consecutive_floods >= MAX_CONSECUTIVE_FLOODS:
+                    cooldown_min = LONG_COOLDOWN_MS // 60000
+                    logger.warning(
+                        f"Hit {self._consecutive_floods} consecutive floods — "
+                        f"cooling down {cooldown_min}min"
+                    )
+                    self.progress["status"] = f"cooldown {cooldown_min}min"
+                    self._rate_limit_events.append({
+                        "type": "LONG_COOLDOWN",
+                        "session": session.session_id,
+                        "seconds": LONG_COOLDOWN_MS // 1000,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+                    await asyncio.sleep(LONG_COOLDOWN_MS / 1000.0)
+                    self._consecutive_floods = 0
+                    self._current_delay = self.delay_ms
+                    self.progress["status"] = "adding"
 
                 delay = await self._get_delay()
                 logger.debug(
