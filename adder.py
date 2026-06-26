@@ -179,6 +179,29 @@ class Adder:
             self.progress["status"] = f"error: {e}"
             return
 
+        # Auto-join destination if not a member
+        try:
+            from telethon.tl.functions.channels import JoinChannelRequest
+            await client(JoinChannelRequest(dest))
+            logger.info(f"Joined destination channel")
+        except Exception as e:
+            # Might already be a member — that's fine
+            logger.debug(f"Join destination: {type(e).__name__}")
+
+        # Self-test: try adding our own account to verify permissions
+        me = await client.get_me()
+        try:
+            await client(InviteToChannelRequest(dest, [me]))
+            logger.info(f"Self-test: successfully added self to destination")
+        except Exception as e:
+            logger.error(
+                f"Cannot add to destination — check permissions: {type(e).__name__}: {e}"
+            )
+            self.progress["status"] = f"error: cannot add to channel ({type(e).__name__})"
+            return
+
+        logger.info(f"Permission check passed — ready to add users")
+
         while not self._stop:
             users = await self.db.get_unadded_users(self.batch_size)
             if not users:
