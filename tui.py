@@ -182,7 +182,7 @@ class TuiDashboard:
         layout.split(
             Layout(name="header", size=3),
             Layout(name="body"),
-            Layout(name="footer", size=7),
+            Layout(name="footer", size=8),
         )
         layout["body"].split_row(
             Layout(name="left"),

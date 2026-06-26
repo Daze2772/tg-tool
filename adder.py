@@ -30,8 +30,10 @@ DEFAULT_JITTER_MS = 15000          # 15 seconds jitter
 PEER_FLOOD_BACKOFF_MS = 120000    # 2 minutes backoff on PEER_FLOOD
 PEER_FLOOD_RETRIES = 5             # Retry same user up to 5 times
 CONSECUTIVE_FLOOD_MULTIPLIER = 2.0 # Double delay on consecutive floods
-MAX_CONSECUTIVE_FLOODS = 3         # After 3 consecutive floods, long cooldown
-LONG_COOLDOWN_MS = 900000          # 15 minute cooldown when hitting flood ceiling
+MAX_CONSECUTIVE_FLOODS = 5         # After 5 consecutive floods, long cooldown
+LONG_COOLDOWN_MS = 300000          # 5 minute cooldown
+ROTATE_EVERY_N_ADDS = 5            # Rotate session after every N successful adds
+ROTATE_ON_PEER_FLOOD = True        # Also rotate immediately on PEER_FLOOD
 
 
 class Adder:
@@ -149,6 +151,7 @@ class Adder:
         self.progress["status"] = "running"
         self._current_delay = self.delay_ms
         self._consecutive_floods = 0
+        self._adds_since_rotate = 0
 
         session = await self.pool.get_session()
         if session is None:
@@ -216,6 +219,27 @@ class Adder:
                     await self.db.mark_added(uid)
                     await self.pool.report_success(session)
                     self.progress["added"] += 1
+                    self._adds_since_rotate += 1
+
+                # Rotate session proactively
+                should_rotate = False
+                if error and "PEER_FLOOD" in error.upper() and ROTATE_ON_PEER_FLOOD:
+                    should_rotate = True
+                elif self._adds_since_rotate >= ROTATE_EVERY_N_ADDS:
+                    should_rotate = True
+
+                if should_rotate:
+                    new_session = await self.pool.get_session()
+                    if new_session and new_session.session_id != session.session_id:
+                        logger.info(
+                            f"Rotating session: {session.session_id} → {new_session.session_id}"
+                        )
+                        session = new_session
+                        client = session.client
+                        dest = await self.resolve_destination(client)
+                        self._adds_since_rotate = 0
+                        self._consecutive_floods = 0
+                        self._current_delay = self.delay_ms
 
                 # Update cached counts
                 self.db_counts["added"] = self.progress["added"]
