@@ -71,12 +71,24 @@ class Adder:
     async def add_user(
         self, client, dest_entity, user_id: int, session: SessionInfo
     ) -> str:
-        """Add one user. Retries on PEER_FLOOD with progressive backoff."""
+        """Add one user. Retries on PEER_FLOOD with progressive backoff.
+        Verifies the user actually appears in the channel after adding."""
         for attempt in range(1, PEER_FLOOD_RETRIES + 1):
             try:
                 user = await client.get_entity(user_id)
                 await client(InviteToChannelRequest(dest_entity, [user]))
-                # Success — decay the delay
+
+                # Verify they actually landed
+                try:
+                    await asyncio.sleep(2)  # Brief wait for server
+                    participants = await client.get_participants(dest_entity, limit=200)
+                    participant_ids = {p.id for p in participants if hasattr(p, 'id')}
+                    if user_id not in participant_ids:
+                        logger.warning(f"User {user_id} not found in channel after add — ghost add")
+                        return "GHOST_ADD"
+                except Exception:
+                    pass  # Verification failed, but add might have worked
+
                 self._consecutive_floods = 0
                 self._current_delay = max(self.delay_ms, self._current_delay * 0.95)
                 return ""
@@ -207,6 +219,10 @@ class Adder:
                     elif "PEER_FLOOD_MAX_RETRIES" in error.upper():
                         await self.db.mark_add_error(uid, error)
                         self.progress["skipped"] += 1
+
+                    elif "GHOST_ADD" in error.upper():
+                        await self.db.mark_add_error(uid, error)
+                        self.progress["failed"] += 1
 
                     elif "PRIVACY" in error.upper() or "NOT_MUTUAL" in error.upper():
                         await self.db.mark_add_error(uid, error)
